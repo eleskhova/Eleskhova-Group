@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://www.eleskhovagroup.co.za/sitemap.xml

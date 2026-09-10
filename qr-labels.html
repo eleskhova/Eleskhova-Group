@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eleskhova Group — Asset Tag QR Label Generator (internal tool)</title>
+<style>
+  :root{--navy:#0F172A;--blue:#0091EA;--slate-200:#E2E8F0;--slate-500:#64748B}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,-apple-system,sans-serif;margin:0;background:#F8FAFC;color:var(--navy)}
+  .toolbar{background:var(--navy);color:#fff;padding:20px 24px}
+  .toolbar h1{margin:0 0 4px;font-size:18px}
+  .toolbar p{margin:0;font-size:13px;opacity:.7}
+  .controls{background:#fff;border-bottom:1px solid var(--slate-200);padding:18px 24px;display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--slate-500)}
+  .field input{height:38px;padding:0 12px;border:1px solid var(--slate-200);border-radius:8px;font-size:14px;min-width:200px}
+  button{cursor:pointer;border:none;border-radius:999px;font-weight:600;font-size:14px;padding:10px 22px;background:var(--blue);color:#fff}
+  button.secondary{background:#fff;border:1px solid var(--slate-200);color:var(--navy)}
+  .grid{padding:24px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:16px}
+  .label{background:#fff;border:1px solid var(--slate-200);border-radius:14px;padding:16px;text-align:center;break-inside:avoid}
+  .label img{width:100%;max-width:160px;height:auto;margin:0 auto}
+  .label .tag{margin-top:10px;font-weight:700;font-size:13px;letter-spacing:.02em}
+  .label .cap{margin-top:2px;font-size:11px;color:var(--slate-500)}
+  @media print{
+    .toolbar,.controls,.no-print{display:none}
+    body{background:#fff}
+    .grid{padding:0}
+    .label{border:1px dashed #999}
+  }
+</style>
+</head>
+<body>
+  <div class="toolbar">
+    <h1>Asset Tag QR Label Generator</h1>
+    <p>Internal tool — not linked from the public site. Generates printable QR stickers for each rented appliance; scanning one opens the fault-report form with the asset tag pre-filled.</p>
+  </div>
+  <div class="controls">
+    <div class="field">Site URL<input id="siteUrl" value="https://www.eleskhovagroup.co.za/"></div>
+    <div class="field">Tag Prefix<input id="prefix" value="ELESKHOV-SR-"></div>
+    <div class="field">Start Number<input id="startNum" type="number" value="1"></div>
+    <div class="field">How Many Labels<input id="count" type="number" value="20"></div>
+    <button id="generateBtn">Generate Labels</button>
+    <button class="secondary no-print" id="printBtn">Print</button>
+  </div>
+  <div class="grid" id="grid"></div>
+
+<script>
+function pad(n) { return String(n).padStart(3, '0'); }
+
+function generate() {
+  const siteUrl = document.getElementById('siteUrl').value.trim().replace(/\/?$/, '/');
+  const prefix = document.getElementById('prefix').value.trim();
+  const start = parseInt(document.getElementById('startNum').value, 10) || 1;
+  const count = Math.min(parseInt(document.getElementById('count').value, 10) || 1, 200);
+  const grid = document.getElementById('grid');
+  grid.innerHTML = '';
+  for (let i = 0; i < count; i++) {
+    const tag = prefix + pad(start + i);
+    const reportUrl = `${siteUrl}?tag=${encodeURIComponent(tag)}#report`;
+    const qrImg = `https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=${encodeURIComponent(reportUrl)}`;
+    const div = document.createElement('div');
+    div.className = 'label';
+    div.innerHTML = `<img src="${qrImg}" alt="QR code for ${tag}"><div class="tag">${tag}</div><div class="cap">Scan to report an issue</div>`;
+    grid.appendChild(div);
+  }
+}
+document.getElementById('generateBtn').addEventListener('click', generate);
+document.getElementById('printBtn').addEventListener('click', () => window.print());
+generate();
+</script>
+</body>
+</html>
