@@ -1,0 +1,63 @@
+# Keeps the free Supabase project (eleskhova-group) from pausing after 7 quiet days.
+# Every 3 days it reads one row of the public rentals price list, the same data anyone sees
+# on the website, so it changes nothing. If the read fails, the run fails and GitHub emails
+# the repo owner: that is the early warning that the database is paused or broken.
+#
+# GitHub switches off scheduled workflows in repos with no commits for 60 days, so on the 1st
+# of each month the workflow also updates .github/keepalive-log.txt.
+#
+# The key below is the PUBLISHABLE (browser) key that is already in the public website code.
+# It only allows what the database rules allow anonymous visitors. Never put a secret or
+# service-role key in this file.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: "17 4 */3 * *"   # every 3 days, 06:17 SAST
+    - cron: "41 5 1 * *"     # 1st of the month, 07:41 SAST: ping + activity commit
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: supabase-keepalive
+  cancel-in-progress: false
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      SUPABASE_URL: https://qngbuxxtyjhnagkwmvjx.supabase.co
+      SUPABASE_PUBLISHABLE_KEY: sb_publishable_kEpcTtohaBzDN94SabffZw_2RsJKFmg
+    steps:
+      - name: Read one row from the public price list
+        run: |
+          set -euo pipefail
+          code=$(curl -sS -o body.json -w '%{http_code}' --retry 3 --retry-delay 20 --max-time 30 \
+            -H "apikey: ${SUPABASE_PUBLISHABLE_KEY}" \
+            "${SUPABASE_URL}/rest/v1/rental_catalogue?select=code&limit=1")
+          echo "HTTP ${code}"
+          if [ "${code}" != "200" ] || ! grep -q '"code"' body.json; then
+            echo "::error::Supabase did not answer normally (HTTP ${code}). Check whether the project is paused."
+            exit 1
+          fi
+
+      - name: Monthly activity commit
+        if: github.event.schedule == '41 5 1 * *' || github.event_name == 'workflow_dispatch'
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github
+
+      - name: Write log line and push
+        if: github.event.schedule == '41 5 1 * *' || github.event_name == 'workflow_dispatch'
+        run: |
+          set -euo pipefail
+          echo "$(date -u +%Y-%m-%dT%H:%MZ) keep-alive ok" >> .github/keepalive-log.txt
+          tail -n 24 .github/keepalive-log.txt > .github/keepalive-log.tmp && mv .github/keepalive-log.tmp .github/keepalive-log.txt
+          git config user.name "keepalive-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .github/keepalive-log.txt
+          git commit -m "Keep-alive log $(date -u +%Y-%m-%d)" || exit 0
+          git push
